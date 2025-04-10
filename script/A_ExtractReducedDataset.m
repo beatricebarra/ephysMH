@@ -17,6 +17,9 @@ filename = '/Users/barrab01/Documents/PostDoc/project/Data/Monell_PCxEphys/Data/
 %folder = '/Users/barrab01/Documents/PostDoc/project/Data/Monell_PCxEphys/Data/040118/24_11_18/'
 %filename = '/Users/barrab01/Documents/PostDoc/project/Data/Monell_PCxEphys/Data/040118/24_11_18/040118__24_11_18.nwb'
 
+folder = '/Users/barrab01/Documents/PostDoc/project/Data/Monell_PCxEphys/Data/040136/24_11_11/'
+filename = '/Users/barrab01/Documents/PostDoc/project/Data/Monell_PCxEphys/Data/040136/24_11_11/040136__24_11_11.nwb'
+
 savefilename = fullfile(folder, '/reduced_dataset.mat')
 savedistrialname = fullfile(folder, 'discarded_trials.mat')
 savetrialnumbers = fullfile(folder, 'trials_numbers.mat')

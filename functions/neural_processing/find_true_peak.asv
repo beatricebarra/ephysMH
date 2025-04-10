@@ -1,0 +1,29 @@
+function [maxidx]= find_true_peak(FR, xmax)
+if isempty(xmax.loc)
+    maxidx = NaN; 
+else  
+    if max.loc(1)==1 && length(max.loc) ==1% if it's the first element and the vector has only one element discard
+        maxidx = NaN; 
+    elseif max.loc(1)==length(FR) % if it's the last element discard
+         maxidx = NaN; 
+    elseif max.loc(1)==1 && length(max.loc)>1 % if it's the first element and the vector has more then one element, take second peak
+        if max.loc(2)~=length(FR)
+        
+            maxidx = xmax.loc(1); 
+        else
+            maxidx = NaN; 
+        end
+    else % The first peak is on the first 
+        if length(xmax.loc)>1
+            if FR(xmax.loc(2)-1) < FR(xmax.loc(2)) && FR(xmax.loc(2)+1) > FR(xmax.loc(2)) % Real peak
+                maxidx = xmax.loc(2); 
+            else
+                maxidx = NaN; 
+            
+            end
+        else
+            maxidx = NaN; 
+        end
+    end
+end
+end

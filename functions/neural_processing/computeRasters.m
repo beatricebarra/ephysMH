@@ -41,4 +41,6 @@ for itrial = 1 : length(spiketime_trains)
             
             
     end
+rmpath(genpath('/Users/barrab01/Documents/Repos/chronux_2_12'));
+
 end

@@ -1,4 +1,4 @@
-function [FRMAT , LABELS, tvect] = computeFRmaps(spiketime_trains, goodunits, trials_numbers,  sig, mint, maxt)
+function [FRMAT , meanFRMAT, meanLATMAT,  LABELS, tvect] = computeFRmaps(spiketime_trains, goodunits, trials_numbers,  sig, mint, maxt)
 % Inputs: 
 % -spiketime_trains : cell array containing sniff and unit spikes for each trial
 % -goodunits: selected units
@@ -49,9 +49,10 @@ for itrial = 1 : length(spiketime_trains)
 end
 
 for iodor = 1: length(odorlabels)
+    meanFRMAT{iodor} = []; 
+    meanLATMAT{iodor} = []; 
     for iconc = 1 : length(trials_numbers.(odorlabels{iodor}).concs)
         for iu = 1 : length(Rast{iodor, iconc})
-            [iodor, iconc, iu]
             if isempty( Rast{iodor, iconc}{iu})
                 FR = zeros(1, length(tvect)); 
             else
@@ -61,6 +62,8 @@ for iodor = 1: length(odorlabels)
                     [FR,t, err] = compute_FR_from_raster(Rast{iodor, iconc}{iu} , sig, mint, maxt, tvect ); 
                 end
             end
+             % Attention this is the chronux findpeaks
+            [meanFRMAT{iodor}(iu, iconc), meanLATMAT{iodor}(iu, iconc)] = max(FR); % for now with the max, but should probably do findpeaks or average in a window
             FRMAT{iodor, iconc}(iu, :)=  FR; 
         end
     end

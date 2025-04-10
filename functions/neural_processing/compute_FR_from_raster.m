@@ -14,5 +14,12 @@ function [FR,t, err] = compute_FR_from_raster(Rast, sig, mint, maxt, tvect )
     end
 
     % Compute psth for this specific cell
-    [FR,t, err] = psth(mystruct, sig,'n', [mint, maxt], 2, tvect);
+    if isfield(mystruct, 'FR')
+    
+        [FR,t, err] = psth(mystruct, sig,'n', [mint, maxt], 2, tvect); % 2 means bootstrap
+    else 
+        FR = zeros(1, length(tvect)); 
+        err = zeros(1, length(tvect)); 
+        t = tvect; 
+    end
 end

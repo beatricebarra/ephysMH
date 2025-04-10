@@ -8,7 +8,7 @@ function [mu, sigma] = GMM_clustering(X, k)
         mu(i) = X(indeces(i));
     end
     
-    % Use the overal variance of the dataset as the initial variance for each cluster.
+    % Use the overal variance ofhelp  the dataset as the initial variance for each cluster.
     sigma = ones(1, k) * sqrt(var(X));
     
     % Assign equal prior probabilities to each cluster.
@@ -22,9 +22,9 @@ function [mu, sigma] = GMM_clustering(X, k)
     W = zeros(m, k);
     
     % Loop until convergence.
-    for (iter = 1:1000)
+    for (iter = 1:10000)
         
-        fprintf('  EM Iteration %d\n', iter);
+        %fprintf('  EM Iteration %d\n', iter);
     
         %%===============================================
         % STEP 3a: Expectation

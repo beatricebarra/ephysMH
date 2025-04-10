@@ -23,7 +23,7 @@ Sniff = nwbFile.acquisition.get('respiration_data').data(:);
 SniffTime = nwbFile.acquisition.get('respiration_data').timestamps(:);  
 fSniff = lowPass(Sniff, round(1/Sniffdt), 10, 3); 
 baselineSniff = lowPass(Sniff, round(1/Sniffdt),0.8, 2); 
-% 
+ 
 % plot_time = 1; 
 % for itrial = 1 : size(trials_start_stop_time, 1)
 %     itrial% find sniff snip 

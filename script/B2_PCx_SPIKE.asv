@@ -1,0 +1,468 @@
+%% Computation of psths and relative ordering by peak latency
+
+addpath(genpath('/Users/barrab01/Documents/Repos/matnwb'));
+addpath(genpath('/Users/barrab01/Documents/Repos/ephysMH'));
+addpath(genpath('/Users/barrab01/Documents/Repos/chronux_2_12'));
+clc
+
+clear all
+
+folder = '/Users/barrab01/Documents/PostDoc/project/Data/Monell_PCxEphys/Data/040108/24_11_14/';
+filename = '/Users/barrab01/Documents/PostDoc/project/Data/Monell_PCxEphys/Data/040108/24_11_14/040108__24_11_14.nwb';
+
+folder ='/Users/barrab01/Documents/PostDoc/project/Data/Monell_PCxEphys/Data/040108/24_11_16/';
+filename ='/Users/barrab01/Documents/PostDoc/project/Data/Monell_PCxEphys/Data/040108/24_11_16/040108__24_11_16.nwb';
+
+
+% Mixing all mice 
+filenames = {...
+    '/Users/barrab01/Documents/PostDoc/project/Data/Monell_PCxEphys/Data/040136/24_11_11/040136__24_11_11.nwb',...
+    '/Users/barrab01/Documents/PostDoc/project/Data/Monell_PCxEphys/Data/040136/24_11_12/040136__24_11_12.nwb',...
+    '/Users/barrab01/Documents/PostDoc/project/Data/Monell_PCxEphys/Data/040116/24_11_13/040116__24_11_13.nwb',...
+    '/Users/barrab01/Documents/PostDoc/project/Data/Monell_PCxEphys/Data/040108/24_11_14/040108__24_11_14.nwb',...
+    '/Users/barrab01/Documents/PostDoc/project/Data/Monell_PCxEphys/Data/040118/12_11_15/040118__24_11_15.nwb',...
+    '/Users/barrab01/Documents/PostDoc/project/Data/Monell_PCxEphys/Data/040108/24_11_16/040108__24_11_16.nwb',...
+    '/Users/barrab01/Documents/PostDoc/project/Data/Monell_PCxEphys/Data/040118/24_11_18/040118__24_11_18.nwb',...
+    }
+
+savefilenames = {...
+    '/Users/barrab01/Documents/PostDoc/project/Data/Monell_PCxEphys/Data/040136/24_11_11/Extracted_040136__24_11_11.mat',...
+    '/Users/barrab01/Documents/PostDoc/project/Data/Monell_PCxEphys/Data/040136/24_11_12/Extracted_040136__24_11_12.mat',...
+    '/Users/barrab01/Documents/PostDoc/project/Data/Monell_PCxEphys/Data/040116/24_11_13/Extracted_040116__24_11_13.mat',...
+    '/Users/barrab01/Documents/PostDoc/project/Data/Monell_PCxEphys/Data/040108/24_11_14/Extracted_040108__24_11_14.mat',...
+    '/Users/barrab01/Documents/PostDoc/project/Data/Monell_PCxEphys/Data/040118/12_11_15/Extracted_040118__24_11_15.mat',...
+    '/Users/barrab01/Documents/PostDoc/project/Data/Monell_PCxEphys/Data/040108/24_11_16/Extracted_040108__24_11_16.mat',...
+    '/Users/barrab01/Documents/PostDoc/project/Data/Monell_PCxEphys/Data/040118/24_11_18/Extracted_040118__24_11_18.mat',...
+    }
+analogFS = 1000; 
+dt = 1/analogFS; 
+
+odorlabels = {'ethyltiglate', 'ethylbutyrate', 'acetophenone', 'heptanone'}; 
+
+%% Read the dataset, extract variables and perform quality check
+for ifilename = 1 : length(filenames)
+     
+    filename = filenames{ifilename}; 
+    nwbFile = nwbRead(filename);
+    % Retrieve start and stop times
+    [Odors, Concentration, FVO, FVC, Sniff, SniffTime, Prex, Postx, spikes, trials_start_stop_time] = extract_variables(nwbFile); 
+    % Process sniff 
+    all_odors = unique(Odors); 
+    Sniffdt = mean(diff(SniffTime)); 
+    SniffFS = 1/Sniffdt; 
+    fSniff = lowPass(Sniff, round(1/Sniffdt), 10, 3); 
+    baselineSniff = lowPass(Sniff, round(1/Sniffdt),0.8, 2); 
+    % Quality control
+    [OB_units_idx, PC_units_idx] = units_quality_check(nwbFile); 
+    good_units_PCx{ifilename} = PC_units_idx; 
+end
+
+%% Read complete dataset with all mice
+savefilenameallmice = '/Users/barrab01/Documents/PostDoc/project/Data/Monell_PCxEphys/Data/all_mice_dataset.mat'; 
+load(savefilenameallmice)
+sig = 0.010; 
+mint = 0; 
+maxt = 0.5;
+tvect = linspace(mint, maxt, (maxt-mint)/sig); 
+
+%% Try out your new synch measure on each mouse and save results
+multivariate_spiketrain = []
+thistrialtable = {}
+mycolormap = jet(10); 
+mintime = -0.2; 
+maxtime = 0.5; 
+results = {}
+mouse_i = 5; 
+for mouse_i= 1:7
+    iunits = find(imouse == mouse_i); 
+    iconditions = (mouse_i-1)*32+1:(mouse_i)*32;
+    dt = 0.001; %median(diff(sort(multivariate_spiketrain))); 
+    maxW = 0.01; 
+    results{mouse_i} = []; 
+    figure
+    irow = 0; 
+    for itrial = 1 : size(all_mice_spikes_table, 2) % this is the condition, i.e all trial types
+        Nrep = length(all_mice_spikes_table{1, itrial}); % Finding the minimum number of repetitions for this trial (some units have less somehow, I think this is a bug
+        for iu = 1 : size(all_mice_spikes_table, 1)
+            Nrep = min([Nrep, length(all_mice_spikes_table{iu, itrial})]); 
+        end
+        % For each repetition
+        for irep = 1 : Nrep
+            disp(['Trial ', num2str(itrial), ' Rep = ',  num2str(irep)])
+            irow = irow+1; 
+            % Selecting units of interest. Here I am merging all odors right
+            % now, but I could filter for units responsive to this odor
+            thistrialtable = {};
+            ii= 0; 
+            for iu = iunits'
+                ii = ii+1; 
+                idx = intersect(find(all_mice_spikes_table{iu, itrial}{irep}>mintime), find(all_mice_spikes_table{iu, itrial}{irep}<maxtime)); 
+                [response_index, pvalue] = find_responsive_units(all_mice_spikes_table{iu, itrial}, [0, 0.15], [-0.2, -0.05]); 
+                if pvalue<0.05
+                    thistrialtable{ii} = all_mice_spikes_table{iu, itrial}{irep}(idx); 
+                end
+                
+            end
+            
+            time_points = [mintime:dt:maxtime]; 
+            total = floor((maxtime-mintime)/dt); 
+            checkpoints = floor(linspace(0.01, 1, 100) * total);  % 10%, 20%, ..., 100%    
+            % Compute synchrony
+            [Synch] = computeSynchMeasure(thistrialtable, time_points, maxW); 
+            % Take max of synch
+            synchpeak = max(Synch(intersect(find(time_points > 0), find(time_points < 0.2)))); 
+            % save features for future plotting
+            results{mouse_i}(irow,:) = [synchpeak, all_mice_condition_table(iconditions(itrial), 3), all_mice_condition_table(iconditions(itrial), 1)]; 
+        
+        end
+    
+    end
+    
+    % Plot changes in synchrony with concentration
+    figure
+    hold on
+    mycolormap = lines(5); 
+    theodors = unique(results{mouse_i}(:,3)); 
+    for iodor = 1 : length(unique(theodors))
+        idxO = find(results{mouse_i}(:,3) == theodors(iodor)); 
+        concentrations = unique(results{mouse_i}(idxO,2)); 
+        means = []; 
+        for ic = 1 : length(concentrations)
+            idxC = find(results{mouse_i}(:,2) == concentrations(ic)); 
+            idx = intersect(idxO, idxC); 
+            %plot((results(idx,2)), (results(idx, 1)),  'o', 'Color', mycolormap(iodor,:))
+            means = [means; mean(results{mouse_i}(idx, 1))]; 
+    
+            errorbar(mean(results{mouse_i}(idx,2)), mean(results{mouse_i}(idx, 1)), std(results{mouse_i}(idx, 1))/sqrt(length(results{mouse_i}(idx, 1))), ...
+                '-o', 'Color', mycolormap(iodor,:), 'MarkerFaceColor', mycolormap(iodor,:))
+        end
+        plot(concentrations, means, '-o', 'Color', mycolormap(iodor,:), 'MarkerFaceColor', mycolormap(iodor,:))
+    end
+    set(gca, 'XScale', 'log')
+    xlabel('Concentration')
+    ylabel('Synchrony')
+
+end
+
+%% Plot mouse specific results
+fig1 = figure; 
+fig2 = figure; 
+fig3 = figure; 
+for mouse_i = 1: 7
+    % Plot changes in synchrony with concentration
+    figure
+    hold on
+    mycolormap = lines(5); 
+    theodors = unique(results{mouse_i}(:,3)); 
+    for iodor = 1 : length(unique(theodors))
+        idxO = find(results{mouse_i}(:,3) == theodors(iodor)); 
+        concentrations = unique(results{mouse_i}(idxO,2)); 
+        means = []; 
+        for ic = 1 : length(concentrations)
+            idxC = find(results{mouse_i}(:,2) == concentrations(ic)); 
+            idx = intersect(idxO, idxC); 
+            %plot((results(idx,2)), (results(idx, 1)),  'o', 'Color', mycolormap(iodor,:))
+            means = [means; mean(results{mouse_i}(idx, 1))]; 
+    
+            errorbar(mean(results{mouse_i}(idx,2)), mean(results{mouse_i}(idx, 1)), std(results{mouse_i}(idx, 1))/sqrt(length(results{mouse_i}(idx, 1))), ...
+                '-o', 'Color', mycolormap(iodor,:), 'MarkerFaceColor', mycolormap(iodor,:))
+        end
+        plot(concentrations, means, '-o', 'Color', mycolormap(iodor,:), 'MarkerFaceColor', mycolormap(iodor,:))
+    end
+    set(gca, 'XScale', 'log')
+    xlabel('Concentration')
+    ylabel('Synchrony')
+    figure(fig1)
+    for iodor = 1 : length(unique(theodors))
+        subplot(1, 4, iodor)
+        hold on
+        idxO = find(results{mouse_i}(:,3) == theodors(iodor)); 
+        concentrations = unique(results{mouse_i}(idxO,2)); 
+        means = []; 
+        for ic = 1 : length(concentrations)
+            idxC = find(results{mouse_i}(:,2) == concentrations(ic)); 
+            idx = intersect(idxO, idxC); 
+            %plot((results(idx,2)), (results(idx, 1)),  'o', 'Color', mycolormap(iodor,:))
+            means = [means; mean(results{mouse_i}(idx, 1))]; 
+    
+            errorbar(mean(results{mouse_i}(idx,2)), mean(results{mouse_i}(idx, 1)), std(results{mouse_i}(idx, 1))/sqrt(length(results{mouse_i}(idx, 1))), ...
+                '-o', 'Color', mycolormap(iodor,:), 'MarkerFaceColor', mycolormap(iodor,:))
+        end
+        plot(concentrations, means, '-o', 'Color', mycolormap(iodor,:), 'MarkerFaceColor', mycolormap(iodor,:))
+        set(gca, 'XScale', 'log')
+        xlabel('Concentration')
+        ylabel('Synchrony')
+    end
+
+    figure(fig2)
+    for iodor = 1 : length(unique(theodors))
+        subplot(1, 4, iodor)
+        hold on
+        idxO = find(results{mouse_i}(:,3) == theodors(iodor)); 
+        x = log10(results{mouse_i}(idxO, 2)); 
+        y = results{mouse_i}(idxO, 1); 
+        idx = ~isinf(x); 
+        x = x(idx); 
+        y = y(idx);
+        plot(x, y, 'o')
+        linearCoef = polyfit(x,y,1);
+        linearFit = polyval(linearCoef,x);
+        plot(x,y,'s', x,linearFit,'r-')
+        %set(gca, 'XScale', 'log')
+        xlabel('Concentration')
+        ylabel('Synchrony')
+    end
+    
+end
+allmice_means = []; 
+for iodor = 1 : length(unique(theodors))
+    allX =  [];
+    allY = [];
+    
+    hold on
+    for mouse_i = 1: 7
+        
+        idxO = find(results{mouse_i}(:,3) == theodors(iodor)); 
+        x = log10(results{mouse_i}(idxO, 2)); 
+        y = results{mouse_i}(idxO, 1); 
+        idx = ~isinf(x); 
+        x = x(idx); 
+        y = y(idx);
+        allX = [allX, x]; 
+        allY = [allY, y]; 
+
+        concentrations = unique(results{mouse_i}(idxO,2)); 
+        means = []; 
+        for ic = 1 : length(concentrations)
+            idxC = find(results{mouse_i}(:,2) == concentrations(ic)); 
+            idxOC = intersect(idxO, idxC); 
+            %plot((results(idx,2)), (results(idx, 1)),  'o', 'Color', mycolormap(iodor,:))
+            means = [means; mean(results{mouse_i}(idxOC, 1))]; 
+        end
+        allmice_means = [allmice_means; means']; 
+    end
+    figure(fig2)
+    subplot(1, 4, iodor)
+    linearCoef = polyfit(allX,allY,1);
+    linearFit = polyval(linearCoef,allX);
+    plot(allX,allY,'s', allX,linearFit,'k-', 'Linewidth', 2)
+    xlabel('Concentration')
+    ylabel('Synchrony')
+    figure(fig3)
+    errorbar(log10(concentrations), mean(allmice_means), std(allmice_means), ...
+                '-o', 'Color', mycolormap(iodor,:), 'MarkerFaceColor', mycolormap(iodor,:), 'Markersize', 10, 'Linewidth', 2)
+    %set(gca, 'XScale', 'log')
+    xlabel('Concentration')
+    ylabel('Synchrony')
+end
+%% NOW DO THE Same BUT MIX UNITS FROM ALL MICE ALL WHILE FILTERING THE UNITS THAT ANSWER TO SPECIFIC ODOR
+
+dt = 0.001; %median(diff(sort(multivariate_spiketrain))); 
+maxW = 0.01; 
+
+irow = 0; 
+% Find units that are responsive across at least one condition of an
+% odorant
+responsiveness = []
+condition_table = all_mice_condition_table(1:32,:); 
+odors = unique(condition_table(:,1)); 
+selunits = {}; 
+for iodor = 1 : length(unique(condition_table(:,1)))
+    selunits{iodor} = []; 
+end
+for iu = 1 : size(all_mice_spikes_table, 1)
+    disp(['Unit ', num2str(iu)])
+    for iodor = 1 : length(unique(condition_table(:,1)))
+        idxO = find(condition_table(:,1) == odors(iodor)); 
+        concs = unique(condition_table(idxO,3));
+        concs = concs(concs>0); 
+        for iconc = 1: length(concs)
+            idxC = find(condition_table(:,3) == concs(iconc)); 
+            idxT = intersect(idxO, idxC); 
+            
+            % Compute whether unit is responsive in this condition
+            [response_index, pvalue] = find_responsive_units( all_mice_spikes_table{iu, idxT}, [0, 0.15], [-0.2, -0.05]); 
+            responsiveness(iu, iodor, iconc) = pvalue;
+        
+            
+            
+     
+        end
+
+        if any(responsiveness(iu, iodor, :)<0.05) % save unit as viable only if responsive
+            selunits{iodor} = [selunits{iodor}, iu] 
+        end
+    end
+end
+[length(selunits{1}), length(selunits{2}), length(selunits{3}), length(selunits{4})]
+%%
+for itrial = 1 : size(all_mice_spikes_table, 2) % this is the condition, i.e all trial types
+    Nrep = length(all_mice_spikes_table{1, itrial}); % Finding the minimum number of repetitions for this trial (some units have less somehow, I think this is a bug
+    for iu = 1 : size(all_mice_spikes_table, 1)
+        Nrep = min([Nrep, length(all_mice_spikes_table{iu, itrial})]); 
+    end
+    % For each repetition
+    for irep = 1 : Nrep
+        disp(['Trial ', num2str(itrial), ' Rep = ',  num2str(irep)])
+        irow = irow+1; 
+        % Taking units from all mice but selecting only units that are
+        % responsive to this odor
+        thistrialtable = {};
+        for iu = 1:size(all_mice_spikes_table, 1)
+            idx = intersect(find(all_mice_spikes_table{iu, itrial}{irep}>mintime), find(all_mice_spikes_table{iu, itrial}{irep}<maxtime)); 
+            [response_index, pvalue] = find_responsive_units(all_mice_spikes_table{iu, itrial}, [0, 0.15], [-0.2, -0.05]); 
+            if pvalue<0.05
+                thistrialtable{ii} = all_mice_spikes_table{iu, itrial}{irep}(idx); 
+            end
+            
+        end
+        
+        time_points = [mintime:dt:maxtime]; 
+        total = floor((maxtime-mintime)/dt); 
+        checkpoints = floor(linspace(0.01, 1, 100) * total);  % 10%, 20%, ..., 100%    
+        % Compute synchrony
+        [Synch] = computeSynchMeasure(thistrialtable, time_points, maxW); 
+        % Take max of synch
+        synchpeak = max(Synch(intersect(find(time_points > 0), find(time_points < 0.2)))); 
+        % save features for future plotting
+        results{mouse_i}(irow,:) = [synchpeak, all_mice_condition_table(iconditions(itrial), 3), all_mice_condition_table(iconditions(itrial), 1)]; 
+    
+    end
+
+end
+%% ALSO DO PCA
+
+%%
+
+[value_max, idx_closest_spike] = cellfun(@(x) min(abs(x-t)) , thistrialtable , 'UniformOutput' , false); 
+    
+% Pre-allocate new_array once
+new_array = cell(size(idx_closest_spike));
+
+% Logical index of empty cells
+empty_idx = cellfun(@isempty, idx_closest_spike);
+
+% Fill empty cells with maxW
+new_array(empty_idx) = {maxW};
+
+% Fill non-empty cells with min(value_max, maxW)
+nonempty_idx = ~empty_idx;
+clipped_values = cellfun(@(v) min(v, maxW), value_max(nonempty_idx), 'UniformOutput', false);
+new_array(nonempty_idx) = clipped_values;
+
+%% Take a trial and test the spike measure
+multivariate_spiketrain = []
+thistrialtable = {}
+
+mintime = -1; 
+maxtime = 1; 
+
+dt = 0.001; %median(diff(sort(multivariate_spiketrain))); 
+
+itrial = 6; 
+for iu = 1 : size(all_mice_spikes_table, 1)
+    multivariate_spiketrain = [multivariate_spiketrain; all_mice_spikes_table{iu, itrial}{1}]; 
+    idx = intersect(find(all_mice_spikes_table{iu, itrial}{1}>mintime), find(all_mice_spikes_table{iu, itrial}{1}<maxtime)); 
+    thistrialtable{iu} = all_mice_spikes_table{iu, itrial}{1}(idx); 
+end
+figure
+hist(diff(sort(multivariate_spiketrain)), 1000)
+
+
+total = floor((maxtime-mintime)/dt); 
+checkpoints = floor(linspace(0.01, 1, 100) * total);  % 10%, 20%, ..., 100%
+SPIKE = []
+tvect = []
+time_points = [mintime:dt:maxtime]; 
+%[D_Sm, S_m_t] = multivariate_average_spike_distance(thistrialtable, max(timepoints) - min(time_points), time_points)
+
+%S = multivariateSPIKEDistance(thistrialtable, time_points)
+far_points = [mintime*10, maxtime*10]; 
+for it = 1 : length(time_points) % for each time instant
+
+    t = time_points(it ); % Compute time 
+    if any(it == checkpoints)
+        fprintf('Progress: %.0f%% complete\n', (it / total) * 100);
+        pause(0.01)
+    end
+    tvect(it) = t; 
+    %cellfun(@(x) find(x<t) , thistrialtable)
+    %Find preceding spikes 
+    preceding_spikes = cellfun(@(x) x(find(x<t)) , thistrialtable , 'UniformOutput' , false); 
+    preceding_spike = cellfun(@(x) min(t-x) , preceding_spikes , 'UniformOutput' , false); 
+    preceding_spike(cellfun('isempty', preceding_spike)) = {far_points(1)}; % maxing out to min time when I have no spike 
+    %nonEmptyCells_preceding = preceding_spike(~cellfun('isempty', preceding_spike));
+    preceding_spikes_array = cell2mat(preceding_spike); % This is tp(n)
+    sigmap = std(preceding_spikes_array); 
+
+    %Find following spikes 
+    following_spikes = cellfun(@(x) x(find(x>t)) , thistrialtable , 'UniformOutput' , false); 
+    following_spike = cellfun(@(x) max(t-x) , following_spikes , 'UniformOutput' , false); 
+    following_spike(cellfun('isempty', following_spike)) = {far_points(2)};
+    %nonEmptyCells_following = following_spike(~cellfun('isempty', following_spike));
+    following_spikes_array = cell2mat(following_spike); % This is tp(n)
+    sigmaf = std(following_spikes_array); 
+    
+    xp_m =1/ mean(t - preceding_spikes_array);
+    xf_m = 1/mean(following_spikes_array -t);
+
+    Num = sigmap*xf_m + sigmaf*xp_m; 
+    Den = mean(following_spikes_array - preceding_spikes_array); 
+    SPIKE(it) = Num/Den; 
+
+end
+
+% Plot spikes and synchrony measure
+figure
+hold on
+%plot(tvect, SPIKE*1000, '-')
+plot(time_points, SPIKE*10000, 'b-')
+%
+% plot(time_points, S_m_t*10000, 'r-')
+hold on
+for iu = 1 : length(thistrialtable)
+    plot(thistrialtable{iu}, -iu*ones(size(thistrialtable{iu})), '|'); 
+end
+xlim([-0.1, 0.5])
+
+%% 
+multivariate_spiketrain = []
+thistrialtable = {}
+
+mintime = -1; 
+maxtime = 1; 
+
+dt = 0.001; %median(diff(sort(multivariate_spiketrain))); 
+
+itrial = 6; 
+for iu = 1 : size(all_mice_spikes_table, 1)
+    multivariate_spiketrain = [multivariate_spiketrain; all_mice_spikes_table{iu, itrial}{1}]; 
+    idx = intersect(find(all_mice_spikes_table{iu, itrial}{1}>mintime), find(all_mice_spikes_table{iu, itrial}{1}<maxtime)); 
+    thistrialtable{iu} = all_mice_spikes_table{iu, itrial}{1}(idx); 
+end
+% Comparing pairwise and multivariate
+mintime = -1; 
+maxtime = 1; 
+time_points = [mintime:dt:maxtime]; 
+
+dt = 0.0001; 
+% find cells with the most spikes
+for iu = 1 : length(thistrialtable)
+    numspikes(iu) = length(thistrialtable{iu}); 
+end
+[NS, I] = sort(numspikes); 
+reduced_dataset = thistrialtable(I(end-20: end)); 
+[D_Sm, S_m_t] = multivariate_average_spike_distance(reduced_dataset, max(timepoints) - min(time_points), time_points)
+
+S = multivariateSPIKEDistance(reduced_dataset, time_points); 
+
+figure
+hold on
+K = 10; 
+plot(time_points, S_m_t*K , 'r-')
+plot(time_points, S*K , 'b-')
+
+hold on
+for iu = 1 : length(reduced_dataset)
+    plot(reduced_dataset{iu}, -iu*ones(size(reduced_dataset{iu})), '|'); 
+end
