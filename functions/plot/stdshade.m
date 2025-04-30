@@ -26,7 +26,7 @@ end
 
 amean=smooth(nanmean(amatrix),smth)';
 astd=nanstd(amatrix); % to get std shading
-astd=nanstd(amatrix)/sqrt(size(amatrix,1)); % to get sem shading
+%astd=nanstd(amatrix)/sqrt(size(amatrix,1)); % to get sem shading
 
 
 if exist('alpha','var')==0 || isempty(alpha) 

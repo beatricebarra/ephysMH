@@ -17,7 +17,7 @@ X_test = X(testIdx, :);
 Y_test = Y(testIdx);
 odor_test = labels(testIdx); 
 % Train a Random Forest Regressor with 100 trees
-numTrees = 1000;
+numTrees = 10;
 rfModel = TreeBagger(numTrees, X_train, Y_train, 'Method', 'regression', 'OOBPrediction', 'on');
 
 % Predict on test data
@@ -36,11 +36,15 @@ fprintf('Mean Squared Error: %.3f\n', nrmse);
 for i = 1:length(odor_test)
     iodor = odor_test(i); 
     mysymbol = label_symbols(iodor); 
-    scatter(Y_test(i), Y_pred(i), 'filled', mysymbol, 'MarkerFaceColor', 'b');
+    scatter(Y_test(i), Y_pred(i),  mysymbol, 'filled', 'MarkerFaceColor', 'b');
 end
 hold on;
 
 plot(Y_test, Y_test, 'r', 'LineWidth', 2); % Ideal prediction line
+linearCoef = polyfit(Y_test,Y_pred,1);
+linearFit = polyval(linearCoef,Y_test);
+hold on
+plot(Y_test,linearFit,'k-', 'Linewidth', 2)
 if strcmp(scale, 'log')
     set(gca, 'YScale', 'log')
     set(gca, 'XScale', 'log')
