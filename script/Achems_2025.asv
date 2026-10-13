@@ -78,10 +78,11 @@ ppm_concentration =  [];
 intensity = []; 
 histdata = []; 
 frdata = []; 
-for mouse_i= 1:7
+for mouse_i= 2
     all_units = find(imouse == mouse_i); 
     figureFR = figure()
     figureH= figure()
+    figureB = figure()
     figtraces = figure()
     actual_sorted_units= {}; 
     % Find which units are responsive for each odor in this mouse
@@ -95,6 +96,7 @@ for mouse_i= 1:7
         [sortedpeaks, sorted_idx{iodor}] = sort(peak_latency(selunits{iodor}, icondition));  
         actual_sorted_units{iodor} = selunits{iodor}(sorted_idx{iodor}); 
     end
+    
     for icondition = 1: length(iconditions)
         % incondition is the index across all conditions in the
         % "all_mice_condition_table" while icond is an index ranging 1:32
@@ -133,6 +135,9 @@ for mouse_i= 1:7
         imagesc((sorted_responses), [0,30])
         colormap(flipud(pink))
         
+        disp(['Number of neurons for odor ', num2str(iodor)])
+        size(sorted_responses)
+        
         hold on
         idx_inh = floor(size(sorted_responses, 2)*abs(-mint/(-mint + maxt))); 
         plot([idx_inh, idx_inh], [0, size(sorted_responses, 1)], '--w', 'Linewidth', 2) 
@@ -154,10 +159,13 @@ for mouse_i= 1:7
         [trialhistdata] = hist(newpeaks, bin_centers); 
         hold on
         plot([median(newpeaks), median(newpeaks)], [0, 80], 'k--')
-        boxplot(80*ones(size(newpeaks)),  'orientation','horizontal')
+        
         title([num2str(iodor) , num2str(iconc) , ])
-        ylim([0, 80])
-        pause
+        ylim([0, 50])
+        
+        figure(figureB)
+        subplot(Nodors, Nconcs, (iodor-1)*Nconcs + iconc)
+        boxplot( newpeaks,80*ones(size(newpeaks)), 'orientation','horizontal')
 
         % Building dataset for regressor on histogram
         realI = computeIntensity(intensity_file, [iodor, conc]); 

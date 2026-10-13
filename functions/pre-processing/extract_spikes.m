@@ -5,7 +5,7 @@ function [spikes_table, count_table, condition_table] = extract_spikes(nwbFile, 
         idx = find(Odors == iodor); 
         Nconcall= [Nconcall, length(unique(Concentration(idx)))]; 
     end
-
+    
     Nconcs = mean(Nconcall); 
     disp('Printing concentration numbers')
     [Nconcall, Nconcs]

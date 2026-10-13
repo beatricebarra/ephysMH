@@ -96,6 +96,7 @@ for mouse_i= 2
         [sortedpeaks, sorted_idx{iodor}] = sort(peak_latency(selunits{iodor}, icondition));  
         actual_sorted_units{iodor} = selunits{iodor}(sorted_idx{iodor}); 
     end
+    
     for icondition = 1: length(iconditions)
         % incondition is the index across all conditions in the
         % "all_mice_condition_table" while icond is an index ranging 1:32
@@ -133,6 +134,9 @@ for mouse_i= 2
         subplot(Nodors+2, Nconcs, (iodor-1)*Nconcs + iconc)
         imagesc((sorted_responses), [0,30])
         colormap(flipud(pink))
+        
+        disp(['Number of neurons for odor ', num2str(iodor)])
+        size(sorted_responses)
         
         hold on
         idx_inh = floor(size(sorted_responses, 2)*abs(-mint/(-mint + maxt))); 

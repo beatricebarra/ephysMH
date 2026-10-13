@@ -54,6 +54,7 @@ for imouse = 1 : 5
     for iodor = 1 : length(meanFRmat)
         plot([(iodor-1)*8+0.5, (iodor-1)*8+0.5], [0, size(TEMP, 1)], 'r', 'Linewidth', 0.8)
         hold on
+
         myxticks = [myxticks, (iodor-1)*8+1]; 
     end
     xticks(myxticks)

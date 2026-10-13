@@ -1,4 +1,15 @@
-function realI = computeIntensity(intensity_file, odor_concentrations)
+function [ realI, ppmconc ]= computeIntensity(intensity_file, odor_concentrations)
+
+% intensit_file : path to file containing the intensity curves. This file
+%                 contains all parameters (bootstrapped) 
+%
+% odor_concentrations: first column contains odor index (1 =
+%                       ethyltiglate, 2 = ethylbutyrate , 3 = acetophenone , 
+%                       4 = 2-heptanone),second column contains corresponding 
+%                       concentration
+%                           
+
+
 %     params = mean(xlsread(intensity_file)); 
 %     
 %     %pure_ppm_odors = {'ethyltiglate':5617.105263, '2-heptanone': 5065.789474, 'ethylbutyrate':16842.10526, 'acetophenone': 526.16}
@@ -47,6 +58,7 @@ function realI = computeIntensity(intensity_file, odor_concentrations)
         % convert concentration ot intensity
         io = odor_concentrations(ii, 1); 
         realI(ii) = psychocurve(log10(odor_concentrations(ii, 2)*parammat(io, 4)), parammat(io, 1), parammat(io, 2), parammat(io, 3)); 
+        ppmconc(ii) = log10(odor_concentrations(ii, 2)*parammat(io, 4)); 
         %plot(log10(odor_concentrations(ii, 2)*parammat(io, 4)), realI(ii), 'o', 'MarkerFaceColor', int_curves_cols(io)) 
     
     end

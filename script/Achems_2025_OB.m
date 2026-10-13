@@ -10,6 +10,7 @@ for mouse_i= 1:7
     % Find which units are responsive for each odor in this mouse
     [selunits] = select_responsive_units(all_mice_spikes_table, all_mice_condition_table, all_units); 
     
+    
     % Find which units are responsive at least once
     sometimes_responsive = selunits{1}; 
     for iodor = 2 : 4
